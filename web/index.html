@@ -4,29 +4,40 @@
         <meta charset="UTF-8">
         <title>WASM Drawing Test</title>
         <style>
-            html {
+            html, body {
                 margin: 0;
                 padding: 0;
             }
             body {
                 background: #111111;
-                font-size: 13pt;
-                max-width: 800px;
                 color: #fafafa;
-                padding: 0;
-                margin: auto;
                 width: 100%;
+                max-width: 800px;
+                margin: auto;
+            }
+            h1 {
+                font-size: 25pt;
+            }
+            p, a, span {
+                font-size: 15pt;
+                line-height: 2;
             }
         </style>
     </head>
     <body>
-        <div class="demo">
-            <h1>DVD ball demo A</h1>
+        <div>
+            <h1>DVD ball</h1>
             <canvas id="canvas_a" width="800" height="600"></canvas>
         </div>
-        <div class="demo">
-            <h1>DVD ball demo B</h1>
+        <div>
+            <h1>Rotating points in 3D</h1>
             <canvas id="canvas_b" width="800" height="600"></canvas>
+        </div>
+        <div>
+            <h1>Utah Teapot</h1>
+            <canvas id="canvas_c" width="800" height="600"></canvas>
+            <span>Model: </span>
+            <a href="https://graphics.cs.utah.edu/teapot/">https://graphics.cs.utah.edu/teapot/</a>
         </div>
     </body>
     <script>
@@ -70,6 +81,7 @@
 
             start_demo(canvas_a, wasm.draw_demo_a);
             start_demo(canvas_b, wasm.draw_demo_b);
+            start_demo(canvas_c, wasm.draw_demo_c);
         })();
     </script>
 </html>

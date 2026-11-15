@@ -24,12 +24,18 @@ void xi_draw_circle(ximage_t *xi, int x0, int y0, int r, color_t color);
 void xi_draw_triangle(ximage_t *xi, int x1, int y1, int x2, int y2, int x3, int y3, color_t color);
 void xi_draw_texture(ximage_t *xi, ximage_t *texture, int x0, int y0, int width, int height);
 
-//#define XI_RGBA(R, G, B, A) (color_t){ .r=(R), .g=(G), .b=(B), .a=(A) }
+int xi_maxi(int a, int b);
+int xi_mini(int a, int b);
+
+float xi_maxf(float a, float b);
+float xi_minf(float a, float b);
+
+int   xi_absi(int a);
+float xi_absf(float a);
+
+
+#define XI_RGBA(R, G, B, A) (color_t){ .r=(R), .g=(G), .b=(B), .a=(A) }
 #define XI_RGB(R, G, B) (color_t){ .r=(R), .g=(G), .b=(B), .a=255 }
-
-
-#ifdef XIMAGE_IMPLEMENTATION
-
 
 #define XI_NULL ((void *)0)
 
@@ -54,6 +60,10 @@ void xi_draw_texture(ximage_t *xi, ximage_t *texture, int x0, int y0, int width,
 #endif
 
 
+// ================================================================================
+#ifdef XIMAGE_IMPLEMENTATION
+
+
 static inline color_t blend_colors(color_t fg, color_t bg)
 {
     color_t color = {
@@ -66,35 +76,34 @@ static inline color_t blend_colors(color_t fg, color_t bg)
 }
 
 
-
 // ==================== MATH ==================== //
 
-static inline int xi_maxi(int a, int b)
+int xi_maxi(int a, int b)
 {
     return a > b? a : b;
 }
 
-static inline int xi_mini(int a, int b)
+int xi_mini(int a, int b)
 {
     return a < b? a : b;
 }
 
-static inline float xi_maxf(float a, float b)
+float xi_maxf(float a, float b)
 {
     return a > b? a : b;
 }
 
-static inline float xi_minf(float a, float b)
+float xi_minf(float a, float b)
 {
     return a < b? a : b;
 }
 
-static inline int xi_absi(int a)
+int xi_absi(int a)
 {
     return a >= 0? a : -a;
 }
 
-static inline float xi_absf(float a)
+float xi_absf(float a)
 {
     return a >= 0.0f? a : -a;
 }

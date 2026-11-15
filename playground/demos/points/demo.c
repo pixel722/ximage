@@ -59,6 +59,7 @@ int main(void)
 
     float angle = 0.0f;
     float dt    = 1.0f / (float)fps;
+    int count = 0;
 
     static char header[100] = {0};
     static unsigned char rgb[WIDTH*HEIGHT*3] = {0};

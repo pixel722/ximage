@@ -68,8 +68,6 @@ void xi_draw_triangle_3c(
     float z1, float z2, float z3,
     color_t color)
 {
-    XI_ASSERT( (xi) != XI_NULL, "xi is NULL");
-
     int xstart = xi_maxi(         0,  xi_mini(x1, xi_mini(x2, x3)));
     int xend   = xi_mini( xi->width,  xi_maxi(x1, xi_maxi(x2, x3)));
     int ystart = xi_maxi(         0,  xi_mini(y1, xi_mini(y2, y3)));
@@ -87,6 +85,10 @@ void xi_draw_triangle_3c(
         return;
     float recD = 1.0f/D;
 
+    z1 = 1.0f / z1;
+    z2 = 1.0f / z2;
+    z3 = 1.0f / z3;
+
     for (int y = ystart; y < yend; ++y)
     {
         for (int x = xstart; x < xend; ++x)
@@ -96,10 +98,9 @@ void xi_draw_triangle_3c(
             float l1 = ((X3-X)*(Y2-Y) - (X2-X)*(Y3-Y)) * recD;
             float l2 = ((X1-X)*(Y3-Y) - (X3-X)*(Y1-Y)) * recD;
             float l3 = 1.0f - l1 - l2;
-            float inv_z = l1/z1 + l2/z2 + l3/z3;
-            float z = 1.0f / inv_z;
+            float z = l1*z1 + l2*z2 + l3*z3;
             float *zb = zbuffer + y*xi->width + x;
-            if (l1 >= 0.0f && l2 >= 0.0f && l3 >= 0.0f && z < *zb)
+            if (l1 >= 0.0f && l2 >= 0.0f && l3 >= 0.0f && z > *zb)
             {
                 *XI_PIXEL(xi, x, y) = color;
                 *zb = z;
@@ -156,7 +157,8 @@ int main(void)
     {
         for (int frame = 0; frame < fps; ++frame)
         {
-            for (int i = 0; i < WIDTH*HEIGHT; ++i) { buffer[i] = FLT_MAX; }
+            //for (int i = 0; i < WIDTH*HEIGHT; ++i) { buffer[i] = FLT_MAX; }
+            for (int i = 0; i < WIDTH*HEIGHT; ++i) { buffer[i] = 0.0f; }
 
             xi_fill_bg(&img, XI_RGB(23, 22, 22));
 
