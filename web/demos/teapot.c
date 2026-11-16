@@ -51,11 +51,6 @@ static void xi_draw_triangle_3z3c(
     float D = (X3-X1)*(Y2-Y1) - (X2-X1)*(Y3-Y1);
     if (D > 0.0f)
         return;
-    float recD = 1.0f/D;
-
-    z1 = 1.0f / z1;
-    z2 = 1.0f / z2;
-    z3 = 1.0f / z3;
 
     for (int y = ystart; y < yend; ++y)
     {
@@ -63,8 +58,8 @@ static void xi_draw_triangle_3z3c(
         {
             float X = (float)x + 0.5f;
             float Y = (float)y + 0.5f;
-            float l1 = ((X3-X)*(Y2-Y) - (X2-X)*(Y3-Y)) * recD;
-            float l2 = ((X1-X)*(Y3-Y) - (X3-X)*(Y1-Y)) * recD;
+            float l1 = ((X3-X)*(Y2-Y) - (X2-X)*(Y3-Y)) / D;
+            float l2 = ((X1-X)*(Y3-Y) - (X3-X)*(Y1-Y)) / D;
             float l3 = 1.0f - l1 - l2;
             float z = l1*z1 + l2*z2 + l3*z3;
             float *zb = zbuffer + y*xi->width + x;
@@ -94,12 +89,30 @@ static v2i to_screen(v2f ndc)
     return (v2i){ (int)(xscale*ndc.x + xoffset), (int)(yscale*ndc.y + yoffset) };
 }
 
-static v3f rotate(v3f v, float c, float s)
+static v3f rotate_x(v3f v, float c, float s)
+{
+    return (v3f){
+        v.x,
+        v.y*c - v.z*s,
+        v.y*s + v.z*c
+    };
+}
+
+static v3f rotate_y(v3f v, float c, float s)
 {
     return (v3f){
         v.x*c - v.z*s,
         v.y,
         v.x*s + v.z*c
+    };
+}
+
+static v3f rotate_z(v3f v, float c, float s)
+{
+    return (v3f){
+        v.x*c - v.y*s,
+        v.x*s + v.y*c,
+        v.z
     };
 }
 
@@ -111,7 +124,6 @@ static v3f v3f_add(v3f a, v3f b)
 
 void draw_demo_c(float dt)
 {
-    //for (int i = 0; i < WIDTH*HEIGHT; ++i) { buffer[i] = FLT_MAX; }
     for (int i = 0; i < WIDTH*HEIGHT; ++i) { zbuffer[i] = 0.0f; }
 
     xi_fill_bg(&img, XI_RGB(23, 22, 22));
@@ -126,9 +138,9 @@ void draw_demo_c(float dt)
         v3f world2 = model->vertices[model->faces[face*3 + 1]];
         v3f world3 = model->vertices[model->faces[face*3 + 2]];
 
-        world1 = v3f_add(rotate(world1, c, s), pos);
-        world2 = v3f_add(rotate(world2, c, s), pos);
-        world3 = v3f_add(rotate(world3, c, s), pos);
+        world1 = v3f_add(rotate_y(world1, c, s), pos);
+        world2 = v3f_add(rotate_y(world2, c, s), pos);
+        world3 = v3f_add(rotate_y(world3, c, s), pos);
 
         v2i screen1 = to_screen(to_ndc(world1));
         v2i screen2 = to_screen(to_ndc(world2));
@@ -138,7 +150,7 @@ void draw_demo_c(float dt)
             screen1.x, screen1.y,
             screen2.x, screen2.y,
             screen3.x, screen3.y,
-            world1.z, world2.z, world3.z,
+            1.0f/world1.z, 1.0f/world2.z, 1.0f/world3.z,
             XI_RGB(255, 0, 0),
             XI_RGB(180, 0, 0),
             XI_RGB(120, 0, 0)

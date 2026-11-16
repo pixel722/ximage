@@ -18,32 +18,30 @@ color_t canvas[WIDTH*HEIGHT];
 float buffer[WIDTH*HEIGHT];
 
 
-#define HPI 1.570796326794896f
 #define PI  3.141592653589793f
-#define DPI 6.283185307179586f
 
 float d2r(float deg)
 {
-    return deg*(float)M_PI/180.0f;
+    return deg*(float)PI/180.0f;
 }
 
-float my_sinf(float x)
+float xi_sinf(float x)
 {
-    while (x >  PI) x -= DPI;
-    while (x < -PI) x += DPI;
+    while (x >  PI) x -= 2.0f*PI;
+    while (x < -PI) x += 2.0f*PI;
 
-    if (x >  HPI) x =  PI - x;
-    if (x < -HPI) x = -PI - x;
+    if (x >  PI/2.0f) x =  PI - x;
+    if (x < -PI/2.0f) x = -PI - x;
 
     float y = x - x*x*x/6.0f + x*x*x*x*x/120.0f - x*x*x*x*x*x*x/5040.0f + x*x*x*x*x*x*x*x*x/362880.0f;
 
     return y;
 }
 
-float my_cosf(float x)
+float xi_cosf(float x)
 {
-    while (x >  PI) x -= DPI;
-    while (x < -PI) x += DPI;
+    while (x >  PI) x -= 2.0f*PI;
+    while (x < -PI) x += 2.0f*PI;
 
     if (x < 0.0f) x = -x;
 
@@ -89,55 +87,20 @@ v2i to_screen(v2f ndc)
     return (v2i){ (int)(xscale*ndc.x + xoffset), (int)(yscale*ndc.y + yoffset) };
 }
 
-
-void xi_draw_triangle_3z(
-    ximage_t *xi, float *zbuffer,
-    int x1, int y1,
-    int x2, int y2,
-    int x3, int y3,
-    float z1, float z2, float z3,
-    color_t color)
+v3f rotate(v3f v, float c, float s)
 {
-    int xstart = xi_maxi(         0,  xi_mini(x1, xi_mini(x2, x3)));
-    int xend   = xi_mini( xi->width,  xi_maxi(x1, xi_maxi(x2, x3)));
-    int ystart = xi_maxi(         0,  xi_mini(y1, xi_mini(y2, y3)));
-    int yend   = xi_mini(xi->height,  xi_maxi(y1, xi_maxi(y2, y3)));
-
-    float X1 = (float)x1;
-    float Y1 = (float)y1;
-    float X2 = (float)x2;
-    float Y2 = (float)y2;
-    float X3 = (float)x3;
-    float Y3 = (float)y3;
-
-    float D = (X3-X1)*(Y2-Y1) - (X2-X1)*(Y3-Y1);
-    if (D > 0.0f)
-        return;
-    float recD = 1.0f/D;
-
-    z1 = 1.0f / z1;
-    z2 = 1.0f / z2;
-    z3 = 1.0f / z3;
-
-    for (int y = ystart; y < yend; ++y)
-    {
-        for (int x = xstart; x < xend; ++x)
-        {
-            float X = (float)x + 0.5f;
-            float Y = (float)y + 0.5f;
-            float l1 = ((X3-X)*(Y2-Y) - (X2-X)*(Y3-Y)) * recD;
-            float l2 = ((X1-X)*(Y3-Y) - (X3-X)*(Y1-Y)) * recD;
-            float l3 = 1.0f - l1 - l2;
-            float z = l1*z1 + l2*z2 + l3*z3;
-            float *zb = zbuffer + y*xi->width + x;
-            if (l1 >= 0.0f && l2 >= 0.0f && l3 >= 0.0f && z > *zb)
-            {
-                *XI_PIXEL(xi, x, y) = color;
-                *zb = z;
-            }
-        }
-    }
+    return (v3f){
+        v.x*c - v.z*s,
+        v.y,
+        v.x*s + v.z*c
+    };
 }
+
+v3f v3f_add(v3f a, v3f b)
+{
+    return (v3f){ a.x+b.x, a.y+b.y, a.z+b.z };
+}
+
 
 void xi_draw_triangle_3z3c(
     ximage_t *xi, float *zbuffer,
@@ -162,11 +125,6 @@ void xi_draw_triangle_3z3c(
     float D = (X3-X1)*(Y2-Y1) - (X2-X1)*(Y3-Y1);
     if (D > 0.0f)
         return;
-    float recD = 1.0f/D;
-
-    z1 = 1.0f / z1;
-    z2 = 1.0f / z2;
-    z3 = 1.0f / z3;
 
     for (int y = ystart; y < yend; ++y)
     {
@@ -174,11 +132,14 @@ void xi_draw_triangle_3z3c(
         {
             float X = (float)x + 0.5f;
             float Y = (float)y + 0.5f;
-            float l1 = ((X3-X)*(Y2-Y) - (X2-X)*(Y3-Y)) * recD;
-            float l2 = ((X1-X)*(Y3-Y) - (X3-X)*(Y1-Y)) * recD;
+
+            float l1 = ((X3-X)*(Y2-Y) - (X2-X)*(Y3-Y)) / D;
+            float l2 = ((X1-X)*(Y3-Y) - (X3-X)*(Y1-Y)) / D;
             float l3 = 1.0f - l1 - l2;
+
             float z = l1*z1 + l2*z2 + l3*z3;
             float *zb = zbuffer + y*xi->width + x;
+
             if (l1 >= 0.0f && l2 >= 0.0f && l3 >= 0.0f && z > *zb)
             {
                 color_t color = {
@@ -192,21 +153,6 @@ void xi_draw_triangle_3z3c(
             }
         }
     }
-}
-
-
-v3f rotate(v3f v, float c, float s)
-{
-    return (v3f){
-        v.x*c - v.z*s,
-        v.y,
-        v.x*s + v.z*c
-    };
-}
-
-v3f v3f_add(v3f a, v3f b)
-{
-    return (v3f){ a.x+b.x, a.y+b.y, a.z+b.z };
 }
 
 
@@ -250,15 +196,13 @@ int main(void)
     {
         for (int frame = 0; frame < fps; ++frame)
         {
-            srand(42);
-            //for (int i = 0; i < WIDTH*HEIGHT; ++i) { buffer[i] = FLT_MAX; }
             for (int i = 0; i < WIDTH*HEIGHT; ++i) { buffer[i] = 0.0f; }
 
             xi_fill_bg(&img, XI_RGB(23, 22, 22));
 
             angle += speed*dt;
-            float c = my_cosf(d2r(angle));
-            float s = my_sinf(d2r(angle));
+            float c = xi_cosf(d2r(angle));
+            float s = xi_sinf(d2r(angle));
 
             for (int face = 0; face < model->faces_count; ++face)
             {
@@ -274,24 +218,11 @@ int main(void)
                 v2i screen2 = to_screen(to_ndc(world2));
                 v2i screen3 = to_screen(to_ndc(world3));
 
-                /*
-                unsigned char r = (char)rand();
-                unsigned char g = (char)rand();
-                unsigned char b = (char)rand();
-                xi_draw_triangle_3c(&img, buffer,
-                    screen1.x, screen1.y,
-                    screen2.x, screen2.y,
-                    screen3.x, screen3.y,
-                    world1.z, world2.z, world3.z,
-                    //XI_RGB(128, 30, 170)
-                    XI_RGB(r, g, b)
-                );
-                */
                 xi_draw_triangle_3z3c(&img, buffer,
                     screen1.x, screen1.y,
                     screen2.x, screen2.y,
                     screen3.x, screen3.y,
-                    world1.z, world2.z, world3.z,
+                    1.0f/world1.z, 1.0f/world2.z, 1.0f/world3.z,
                     XI_RGB(255, 0, 0),
                     XI_RGB(0, 255, 0),
                     XI_RGB(0, 0, 255)

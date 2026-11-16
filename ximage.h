@@ -184,9 +184,8 @@ void xi_draw_triangle(ximage_t *xi, int x1, int y1, int x2, int y2, int x3, int 
     float Y3 = (float)y3;
 
     float D = (X3-X1)*(Y2-Y1) - (X2-X1)*(Y3-Y1);
-    if (xi_absf(D) < 1.0e-12f)
+    if (xi_absf(D) < 0.0f)
         return;
-    float recD = 1.0f/D;
 
     for (int y = ystart; y < yend; ++y)
     {
@@ -194,8 +193,8 @@ void xi_draw_triangle(ximage_t *xi, int x1, int y1, int x2, int y2, int x3, int 
         {
             float X = (float)x + 0.5f;
             float Y = (float)y + 0.5f;
-            float l1 = ((X3-X)*(Y2-Y) - (X2-X)*(Y3-Y)) * recD;
-            float l2 = ((X2-X)*(Y1-Y) - (X1-X)*(Y2-Y)) * recD;
+            float l1 = ((X3-X)*(Y2-Y) - (X2-X)*(Y3-Y)) / D;
+            float l2 = ((X2-X)*(Y1-Y) - (X1-X)*(Y2-Y)) / D;
             float l3 = 1.0f - l1 - l2;
             if (l1 >= 0.0f && l2 >= 0.0f && l3 >= 0.0f)
                 *XI_PIXEL(xi, x, y) = color;

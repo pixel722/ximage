@@ -28,8 +28,24 @@ void draw_demo_a(float dt)
     ball.pos.x += ball.speed.x*dt;
     ball.pos.y += ball.speed.y*dt;
 
-    if (ball.pos.x - RADIUS <= 0.0 || ball.pos.x + RADIUS >= WIDTH)
+    if (ball.pos.x - RADIUS <= 0.0)
+    {
         ball.speed.x = -ball.speed.x;
-    if (ball.pos.y - RADIUS <= 0.0 || ball.pos.y + RADIUS >= HEIGHT)
+        ball.pos.x   = RADIUS;
+    }
+    if (ball.pos.x + RADIUS >= WIDTH)
+    {
+        ball.speed.x = -ball.speed.x;
+        ball.pos.x   = WIDTH-RADIUS;
+    }
+    if (ball.pos.y - RADIUS <= 0.0)
+    {
         ball.speed.y = -ball.speed.y;
+        ball.pos.y   = RADIUS;
+    }
+    if (ball.pos.y + RADIUS >= HEIGHT)
+    {
+        ball.speed.y = -ball.speed.y;
+        ball.pos.y   = HEIGHT-RADIUS;
+    }
 }

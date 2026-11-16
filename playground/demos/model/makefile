@@ -6,7 +6,7 @@ output.mp4: build/out
 build/out: demo.c build/utah_teapot.c
 	gcc -Wall -Wextra -Wconversion -O3 -march=native -mavx2 -lm $< -o $@
 
-build/utah_teapot.c: ../../../assets/utah_teapot.obj
+build/utah_teapot.c: ../../../assets/utah_teapot.obj build
 	../../../assets/obj2c.py $< $@ utah_teapot
 
 build:
