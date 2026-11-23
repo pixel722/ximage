@@ -22,6 +22,8 @@ void xi_put_pixel(ximage_t *xi, int x, int y, color_t color);
 void xi_draw_rect(ximage_t *xi, int x0, int y0, int width, int height, color_t color);
 void xi_draw_circle(ximage_t *xi, int x0, int y0, int r, color_t color);
 void xi_draw_triangle(ximage_t *xi, int x1, int y1, int x2, int y2, int x3, int y3, color_t color);
+void xi_draw_triangle_3c(ximage_t *xi, int x1, int y1, int x2, int y2, int x3, int y3, color_t c1, color_t c2, color_t c3);
+void xi_draw_triangle_3z3c(ximage_t *xi, float *zbuffer, int x1, int y1, int x2, int y2, int x3, int y3, float z1, float z2, float z3, color_t c1, color_t c2, color_t c3);
 void xi_draw_texture(ximage_t *xi, ximage_t *texture, int x0, int y0, int width, int height);
 
 int xi_maxi(int a, int b);
@@ -33,11 +35,16 @@ float xi_minf(float a, float b);
 int   xi_absi(int a);
 float xi_absf(float a);
 
+float xi_d2r(float deg);
+float xi_sinf(float x);
+float xi_cosf(float x);
+
+
+#define XI_NULL ((void *)0)
+#define XI_PI  3.141592653589793f
 
 #define XI_RGBA(R, G, B, A) (color_t){ .r=(R), .g=(G), .b=(B), .a=(A) }
 #define XI_RGB(R, G, B) (color_t){ .r=(R), .g=(G), .b=(B), .a=255 }
-
-#define XI_NULL ((void *)0)
 
 #ifndef XI_ASSERT
     #define XI_ASSERT(cond, msg)
@@ -108,6 +115,36 @@ float xi_absf(float a)
     return a >= 0.0f? a : -a;
 }
 
+float xi_d2r(float deg)
+{
+    return deg*(float)XI_PI/180.0f;
+}
+
+float xi_sinf(float x)
+{
+    while (x >  XI_PI) x -= 2.0f*XI_PI;
+    while (x < -XI_PI) x += 2.0f*XI_PI;
+
+    if (x >  XI_PI/2.0f) x =  XI_PI - x;
+    if (x < -XI_PI/2.0f) x = -XI_PI - x;
+
+    float y = x - x*x*x/6.0f + x*x*x*x*x/120.0f - x*x*x*x*x*x*x/5040.0f + x*x*x*x*x*x*x*x*x/362880.0f;
+
+    return y;
+}
+
+float xi_cosf(float x)
+{
+    while (x >  XI_PI) x -= 2.0f*XI_PI;
+    while (x < -XI_PI) x += 2.0f*XI_PI;
+
+    if (x < 0.0f) x = -x;
+
+    float y = 1 - x*x/2.0f + x*x*x*x/24.0f - x*x*x*x*x*x/720.f + x*x*x*x*x*x*x*x/40320.0f;
+
+    return y;
+}
+
 
 // ==================== 2D PRIMITIVES ==================== //
 
@@ -169,37 +206,143 @@ void xi_draw_circle(ximage_t *xi, int x0, int y0, int r, color_t color)
     }
 }
 
+typedef struct
+{
+    int xstart;
+    int xend;
+    int ystart;
+    int yend;
+
+    float X1;
+    float Y1;
+    float X2;
+    float Y2;
+    float X3;
+    float Y3;
+
+    float D;
+
+    float X;
+    float Y;
+    float l1;
+    float l2;
+    float l3;
+} xi_triangle_t;
+
+static inline int xi_init_triangle(xi_triangle_t *tri, ximage_t *xi, int x1, int y1, int x2, int y2, int x3, int y3)
+{
+    tri->xstart = xi_maxi(         0,  xi_mini(x1, xi_mini(x2, x3)));
+    tri->xend   = xi_mini( xi->width,  xi_maxi(x1, xi_maxi(x2, x3)));
+    tri->ystart = xi_maxi(         0,  xi_mini(y1, xi_mini(y2, y3)));
+    tri->yend   = xi_mini(xi->height,  xi_maxi(y1, xi_maxi(y2, y3)));
+
+    tri->X1 = (float)x1;
+    tri->Y1 = (float)y1;
+    tri->X2 = (float)x2;
+    tri->Y2 = (float)y2;
+    tri->X3 = (float)x3;
+    tri->Y3 = (float)y3;
+
+    tri->D = (tri->X3 - tri->X1)*(tri->Y2 - tri->Y1) - (tri->X2 - tri->X1)*(tri->Y3 - tri->Y1);
+
+    if (xi_absf(tri->D) < 1.0e-12f)
+    {
+        return 0;
+    }
+
+    return 1;
+}
+
+static inline int xi_point_in_triangle(xi_triangle_t *tri, int x, int y)
+{
+    float X = (float)x + 0.5f;
+    float Y = (float)y + 0.5f;
+    tri->l1 = ((tri->X3 - X)*(tri->Y2 - Y) - (tri->X2 - X)*(tri->Y3 - Y)) / tri->D;
+    tri->l3 = ((tri->X2 - X)*(tri->Y1 - Y) - (tri->X1 - X)*(tri->Y2 - Y)) / tri->D;
+    tri->l2 = 1.0f - tri->l1 - tri->l3;
+
+    if (tri->l1 >= 0.0f && tri->l2 >= 0.0f && tri->l3 >= 0.0f)
+        return 1;
+
+    return 0;
+}
+
+color_t xi_lerp_colors(xi_triangle_t *tri, color_t c1, color_t c2, color_t c3)
+{
+    color_t color = {0};
+
+    color.r = (unsigned char) (tri->l1*(float)c1.r + tri->l2*(float)c2.r + tri->l3*(float)c3.r);
+    color.g = (unsigned char) (tri->l1*(float)c1.g + tri->l2*(float)c2.g + tri->l3*(float)c3.g);
+    color.b = (unsigned char) (tri->l1*(float)c1.b + tri->l2*(float)c2.b + tri->l3*(float)c3.b);
+    color.a = (unsigned char) (tri->l1*(float)c1.a + tri->l2*(float)c2.a + tri->l3*(float)c3.a);
+
+    return color;
+}
+
 void xi_draw_triangle(ximage_t *xi, int x1, int y1, int x2, int y2, int x3, int y3, color_t color)
 {
-    int xstart = xi_maxi(         0,  xi_mini(x1, xi_mini(x2, x3)));
-    int xend   = xi_mini( xi->width,  xi_maxi(x1, xi_maxi(x2, x3)));
-    int ystart = xi_maxi(         0,  xi_mini(y1, xi_mini(y2, y3)));
-    int yend   = xi_mini(xi->height,  xi_maxi(y1, xi_maxi(y2, y3)));
-
-    float X1 = (float)x1;
-    float Y1 = (float)y1;
-    float X2 = (float)x2;
-    float Y2 = (float)y2;
-    float X3 = (float)x3;
-    float Y3 = (float)y3;
-
-    float D = (X3-X1)*(Y2-Y1) - (X2-X1)*(Y3-Y1);
-    if (xi_absf(D) < 0.0f)
+    xi_triangle_t tri = {0};
+    if (xi_init_triangle(&tri, xi, x1, y1, x2, y2, x3, y3) == 0)
         return;
 
-    for (int y = ystart; y < yend; ++y)
-    {
-        for (int x = xstart; x < xend; ++x)
-        {
-            float X = (float)x + 0.5f;
-            float Y = (float)y + 0.5f;
-            float l1 = ((X3-X)*(Y2-Y) - (X2-X)*(Y3-Y)) / D;
-            float l2 = ((X2-X)*(Y1-Y) - (X1-X)*(Y2-Y)) / D;
-            float l3 = 1.0f - l1 - l2;
-            if (l1 >= 0.0f && l2 >= 0.0f && l3 >= 0.0f)
+    for (int y = tri.ystart; y < tri.yend; ++y)
+        for (int x = tri.xstart; x < tri.xend; ++x)
+            if (xi_point_in_triangle(&tri, x, y))
                 *XI_PIXEL(xi, x, y) = color;
-        }
-    }
+}
+
+void xi_draw_triangle_3c(ximage_t *xi, int x1, int y1, int x2, int y2, int x3, int y3, color_t c1, color_t c2, color_t c3)
+{
+    xi_triangle_t tri = {0};
+    if (xi_init_triangle(&tri, xi, x1, y1, x2, y2, x3, y3) == 0)
+        return;
+
+    for (int y = tri.ystart; y < tri.yend; ++y)
+        for (int x = tri.xstart; x < tri.xend; ++x)
+            if (xi_point_in_triangle(&tri, x, y))
+                *XI_PIXEL(xi, x, y) = xi_lerp_colors(&tri, c1, c2, c3);
+}
+
+void xi_draw_triangle_3z(ximage_t *xi, float *zbuffer, int x1, int y1, int x2, int y2, int x3, int y3, float z1, float z2, float z3, color_t color)
+{
+    xi_triangle_t tri = {0};
+    if (xi_init_triangle(&tri, xi, x1, y1, x2, y2, x3, y3) == 0)
+        return;
+
+    for (int y = tri.ystart; y < tri.yend; ++y)
+        for (int x = tri.xstart; x < tri.xend; ++x)
+            if (xi_point_in_triangle(&tri, x, y))
+                if (tri.D < 0)
+                {
+                    float z = tri.l1*z1 + tri.l2*z2 + tri.l3*z3;
+                    float *zb = zbuffer + y*xi->width + x;
+                    if (z > *zb)
+                    {
+                        *XI_PIXEL(xi, x, y) = color;
+                        *zb = z;
+                    }
+                }
+}
+
+void xi_draw_triangle_3z3c(ximage_t *xi, float *zbuffer, int x1, int y1, int x2, int y2, int x3, int y3, float z1, float z2, float z3, color_t c1, color_t c2, color_t c3)
+{
+    xi_triangle_t tri = {0};
+    if (xi_init_triangle(&tri, xi, x1, y1, x2, y2, x3, y3) == 0)
+        return;
+
+    for (int y = tri.ystart; y < tri.yend; ++y)
+        for (int x = tri.xstart; x < tri.xend; ++x)
+            if (xi_point_in_triangle(&tri, x, y))
+                if (tri.D < 0)
+                {
+                    float z = tri.l1*z1 + tri.l2*z2 + tri.l3*z3;
+                    float *zb = zbuffer + y*xi->width + x;
+                    if (z > *zb)
+                    {
+                        *XI_PIXEL(xi, x, y) = xi_lerp_colors(&tri, c1, c2, c3);
+                        *zb = z;
+                    }
+                }
 }
 
 void xi_draw_texture(ximage_t *xi, ximage_t *texture, int x0, int y0, int width, int height)
@@ -221,6 +364,7 @@ void xi_draw_texture(ximage_t *xi, ximage_t *texture, int x0, int y0, int width,
         }
     }
 }
+
 
 #endif // #ifdef XIMAGE_IMPLEMENTATION
 
